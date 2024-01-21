@@ -1,0 +1,3 @@
+C:/Users/boGGruz/CLionProjects/ChunkList/cmake-build-debug/CMakeFiles/ChunkList.dir
+C:/Users/boGGruz/CLionProjects/ChunkList/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/boGGruz/CLionProjects/ChunkList/cmake-build-debug/CMakeFiles/rebuild_cache.dir
