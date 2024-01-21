@@ -35,10 +35,10 @@ namespace fefu_laboratory_two {
     };
 
     template<typename ValueType>
-    class Chunk{
+    class Chunk {
     public:
         using difference_type = std::ptrdiff_t;
-        using pointer = ValueType*;
+        using pointer = ValueType *;
         using size_type = std::size_t;
         using value_type = ValueType;
 
@@ -46,10 +46,10 @@ namespace fefu_laboratory_two {
         int current_chunk_size = 0; //Number of already located in chunk
         pointer chunk = nullptr;
         Allocator<value_type> allocator;
-        Chunk* prev;
-        Chunk* next;
+        Chunk *prev;
+        Chunk *next;
 
-        explicit Chunk(int size): chunk_size(size) {
+        explicit Chunk(int size) : chunk_size(size) {
             chunk = allocator.allocate(size);
         }
 
@@ -57,13 +57,13 @@ namespace fefu_laboratory_two {
             return chunk_size;
         }
 
-        ValueType& operator[](difference_type index) {
+        ValueType &operator[](difference_type index) {
             return chunk[index];
         }
 
         Chunk(const Chunk<ValueType> &other) noexcept {
             chunk = allocator.allocate(other.chunk_size);
-            for (size_type i = 0; i < other.chunk_size; i++){
+            for (size_type i = 0; i < other.chunk_size; i++) {
                 chunk[i] = other.chunk[i];
             }
         }
@@ -72,7 +72,8 @@ namespace fefu_laboratory_two {
     template<typename ValueType>
     class ChunkList_iterator {
     protected:
-        Chunk<ValueType>* chunks = nullptr;
+        Chunk<ValueType> *chunk = nullptr; //Chunk, which is pointed by iterator
+        int iterator_position = 0; // Iterator position in chunk
 
     public:
         using iterator_category = std::random_access_iterator_tag;
@@ -87,57 +88,152 @@ namespace fefu_laboratory_two {
 
         ChunkList_iterator &operator=(const ChunkList_iterator &) = default;
 
-        ~ChunkList_iterator();
+        ~ChunkList_iterator() = default;
 
-        friend void swap(ChunkList_iterator<ValueType> &, ChunkList_iterator<ValueType> &);
+        ChunkList_iterator(Chunk<value_type> *current_chunk, std::size_t index) : chunk(current_chunk),
+                                                                                  iterator_position(index) {}
 
-        friend bool operator==(const ChunkList_iterator<ValueType> &,
-                               const ChunkList_iterator<ValueType> &);
+        friend void swap(ChunkList_iterator<ValueType> &left, ChunkList_iterator<ValueType> &right) {
+            std::swap(left.chunk, right.chunk);
+            std::swap(left.iterator_position, right.iterator_position);
+        }
 
-        friend bool operator!=(const ChunkList_iterator<ValueType> &,
-                               const ChunkList_iterator<ValueType> &);
+        friend bool operator==(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
+            return left.iterator_position == right.iterator_position;
+        }
 
-        reference operator*() const;
+        friend bool operator!=(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
+            return left.iterator_position != right.iterator_position;
+        }
 
-        pointer operator->() const;
+//        reference operator*() const {
+//            return static_cast<reference>(chunk[iterator_position]);
+//        }
+//
+//        pointer operator->() const {
+//            return this->chunk[this->iterator_position];
+//        }
 
-        ChunkList_iterator &operator++();
+        ChunkList_iterator &operator++() {
+            if (chunk == nullptr)
+                throw std::exception();
+            int chunk_size = this->chunk->GetChunkSize();
+            if (this->iterator_position == chunk_size - 1) {
+                this->chunk = nullptr;
+                this->iterator_position = 0;
+                return *this;
+            } else {
+                ++this->iterator_position;
+                return *this;
+            }
+        }
 
-        ChunkList_iterator operator++(int);
+        ChunkList_iterator operator++(int) {
+            if (chunk == nullptr)
+                throw std::exception();
+            ChunkList_iterator temp(*this);
+            if (iterator_position == chunk->GetChunkSize() - 1) {
+                chunk = nullptr;
+                iterator_position = 0;
+            } else {
+                ++this->iterator_position;
+            }
+            return temp;
+        }
 
-        ChunkList_iterator &operator--();
+        ChunkList_iterator &operator--() {
+            if (chunk == nullptr)
+                throw std::exception();
+            if (this->iterator_position == 0) {
+                this->chunk = nullptr;
+                return *this;
+            } else {
+                --this->iterator_position;
+                return *this;
+            }
+        }
 
-        ChunkList_iterator operator--(int);
+        ChunkList_iterator operator--(int) {
+            if (chunk == nullptr)
+                throw std::exception();
+            ChunkList_iterator temp(*this);
+            if (iterator_position == 0) {
+                chunk = nullptr;
+            } else {
+                --this->iterator_position;
+            }
+            return temp;
+        }
 
-        ChunkList_iterator operator+(const difference_type &) const;
+        ChunkList_iterator operator+(const difference_type &index) const {
+            ChunkList_iterator temp(*this);
 
-        ChunkList_iterator &operator+=(const difference_type &);
+            if (iterator_position + index >= chunk->GetChunkSize()) {
+                temp.chunk = nullptr;
+                temp.iterator_position = 0;
+            } else {
+                temp.iterator_position = iterator_position + index;
+            }
 
-        ChunkList_iterator operator-(const difference_type &) const;
+            return temp;
+        }
 
-        ChunkList_iterator &operator-=(const difference_type &);
+        ChunkList_iterator &operator+=(const difference_type &index) {
+            if (iterator_position + index >= chunk->GetChunkSize()) {
+                chunk = nullptr;
+                iterator_position = 0;
+            } else {
+                iterator_position = iterator_position + index;
+            }
+            return *this;
+        }
 
-        difference_type operator-(const ChunkList_iterator &) const;
+        ChunkList_iterator operator-(const difference_type &index) const {
+            ChunkList_iterator temp(*this);
 
-        reference operator[](const difference_type &);
+            if (iterator_position - index < 0) {
+                temp.chunk = nullptr;
+                temp.iterator_position = 0;
+            } else {
+                temp.iterator_position = iterator_position - index;
+            }
 
-        friend bool operator<(const ChunkList_iterator<ValueType> &,
-                              const ChunkList_iterator<ValueType> &);
+            return temp;
+        }
 
-        friend bool operator<=(const ChunkList_iterator<ValueType> &,
-                               const ChunkList_iterator<ValueType> &);
+        ChunkList_iterator &operator-=(const difference_type &index) {
+            if (iterator_position - index < 0) {
+                chunk = nullptr;
+                iterator_position = 0;
+            } else {
+                iterator_position = iterator_position - index;
+            }
+            return *this;
+        }
 
-        friend bool operator>(const ChunkList_iterator<ValueType> &,
-                              const ChunkList_iterator<ValueType> &);
+        reference operator[](const difference_type &index) {
+            return reinterpret_cast<int &>(chunk[index]);
+        }
 
-        friend bool operator>=(const ChunkList_iterator<ValueType> &,
-                               const ChunkList_iterator<ValueType> &);
-        // operator<=> will be handy
+        friend bool operator<(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
+            return left.iterator_position < right.iterator_position;
+        }
+
+        friend bool operator<=(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
+            return left.iterator_position <= right.iterator_position;
+        }
+
+        friend bool operator>(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
+            return left.iterator_position > right.iterator_position;
+        }
+
+        friend bool operator>=(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
+            return left.iterator_position >= right.iterator_position;
+        }
     };
 
     template<typename ValueType>
-    class ChunkList_const_iterator {
-        // Shouldn't give non const references on value
+    class ChunkList_const_iterator : public ChunkList_iterator<ValueType> {
     public:
         using iterator_category = std::random_access_iterator_tag;
         using value_type = ValueType;
@@ -145,63 +241,156 @@ namespace fefu_laboratory_two {
         using pointer = const ValueType *;
         using reference = const ValueType &;
 
-        ChunkList_const_iterator() noexcept;
+        ChunkList_const_iterator() : ChunkList_iterator<ValueType>() {};
 
-        ChunkList_const_iterator(const ChunkList_const_iterator &) noexcept;
+        ChunkList_const_iterator(const ChunkList_const_iterator &other) noexcept = default;
 
-        ChunkList_const_iterator(const ChunkList_iterator<ValueType> &) noexcept;
+        ChunkList_const_iterator(Chunk<value_type> *current_chunk, std::size_t index) :
+                ChunkList_iterator<value_type>(const_cast<Chunk<value_type> *>(current_chunk), index) {}
 
-        ChunkList_const_iterator &operator=(const ChunkList_const_iterator &);
+        ChunkList_const_iterator &operator=(const ChunkList_const_iterator &) = default;
 
-        ChunkList_const_iterator &operator=(const ChunkList_iterator<ValueType> &);
+        ~ChunkList_const_iterator() = default;
 
-        ~ChunkList_const_iterator();
+        friend void swap(ChunkList_const_iterator<ValueType> &left, ChunkList_const_iterator<ValueType> &right) {
+            std::swap(left.chunk, right.chunk);
+            std::swap(left.iterator_position, right.iterator_position);
+        }
 
-        friend void swap(ChunkList_const_iterator<ValueType> &,
-                         ChunkList_const_iterator<ValueType> &);
+        friend bool
+        operator==(const ChunkList_const_iterator<ValueType> &left, const ChunkList_const_iterator<ValueType> &right) {
+            return left.iterator_position == right.iterator_position;
+        }
 
-        friend bool operator==(const ChunkList_const_iterator<ValueType> &,
-                               const ChunkList_const_iterator<ValueType> &);
+        friend bool
+        operator!=(const ChunkList_const_iterator<ValueType> &left, const ChunkList_const_iterator<ValueType> &right) {
+            return left.iterator_position != right.iterator_position;
+        }
 
-        friend bool operator!=(const ChunkList_const_iterator<ValueType> &,
-                               const ChunkList_const_iterator<ValueType> &);
+//        reference operator*() const;
+//
+//        pointer operator->() const;
 
-        reference operator*() const;
+        ChunkList_const_iterator &operator++() {
+            if (this->chunk == nullptr)
+                throw std::exception();
+            int chunk_size = this->chunk->GetChunkSize();
+            if (this->iterator_position == chunk_size - 1) {
+                this->chunk = nullptr;
+                this->iterator_position = 0;
+                return *this;
+            } else {
+                ++this->iterator_position;
+                return *this;
+            }
+        }
 
-        pointer operator->() const;
+        ChunkList_const_iterator operator++(int) {
+            if (this->chunk == nullptr)
+                throw std::exception();
+            ChunkList_const_iterator temp(*this);
+            if (this->iterator_position == this->chunk->GetChunkSize() - 1) {
+                this->chunk = nullptr;
+                this->iterator_position = 0;
+            } else {
+                ++this->iterator_position;
+            }
+            return temp;
+        }
 
-        ChunkList_const_iterator &operator++();
+        ChunkList_const_iterator &operator--() {
+            if (this->chunk == nullptr)
+                throw std::exception();
+            if (this->iterator_position == 0) {
+                this->chunk = nullptr;
+                return *this;
+            } else {
+                --this->iterator_position;
+                return *this;
+            }
+        }
 
-        ChunkList_const_iterator operator++(int);
+        ChunkList_const_iterator operator--(int) {
+            if (this->chunk == nullptr)
+                throw std::exception();
+            ChunkList_const_iterator temp(*this);
+            if (this->iterator_position == 0) {
+                this->chunk = nullptr;
+            } else {
+                --this->iterator_position;
+            }
+            return temp;
+        }
 
-        ChunkList_const_iterator &operator--();
+        ChunkList_const_iterator operator+(const difference_type &index) const {
+            ChunkList_const_iterator temp(*this);
 
-        ChunkList_const_iterator operator--(int);
+            if (this->iterator_position + index >= this->chunk->GetChunkSize()) {
+                temp.chunk = nullptr;
+                temp.iterator_position = 0;
+            } else {
+                temp.iterator_position = this->iterator_position + index;
+            }
 
-        ChunkList_const_iterator operator+(const difference_type &) const;
+            return temp;
+        }
 
-        ChunkList_const_iterator &operator+=(const difference_type &);
+        ChunkList_const_iterator &operator+=(const difference_type &index) {
+            if (this->iterator_position + index >= this->chunk->GetChunkSize()) {
+                this->chunk = nullptr;
+                this->iterator_position = 0;
+            } else {
+                this->iterator_position = this->iterator_position + index;
+            }
+            return *this;
+        }
 
-        ChunkList_const_iterator operator-(const difference_type &) const;
+        ChunkList_const_iterator operator-(const difference_type &) const {
+            ChunkList_const_iterator temp(*this);
 
-        ChunkList_const_iterator &operator-=(const difference_type &);
+            if (this->iterator_position - this->index < 0) {
+                temp.chunk = nullptr;
+                temp.iterator_position = 0;
+            } else {
+                temp.iterator_position = this->iterator_position - this->index;
+            }
 
-        difference_type operator-(const ChunkList_const_iterator &) const;
+            return temp;
+        }
 
-        reference operator[](const difference_type &);
+        ChunkList_const_iterator &operator-=(const difference_type &) {
+            if (this->iterator_position - this->index < 0) {
+                this->chunk = nullptr;
+                this->iterator_position = 0;
+            } else {
+                this->iterator_position = this->iterator_position - this->index;
+            }
+            return *this;
+        }
 
-        friend bool operator<(const ChunkList_const_iterator<ValueType> &,
-                              const ChunkList_const_iterator<ValueType> &);
+        reference operator[](const difference_type &index) {
+            return reinterpret_cast<int &>(this->chunk[index]);
+        }
 
-        friend bool operator<=(const ChunkList_const_iterator<ValueType> &,
-                               const ChunkList_const_iterator<ValueType> &);
+        friend bool operator<(const ChunkList_const_iterator<ValueType> &left,
+                              const ChunkList_const_iterator<ValueType> &right) {
+            return left.iterator_position < right.iterator_position;
+        }
 
-        friend bool operator>(const ChunkList_const_iterator<ValueType> &,
-                              const ChunkList_const_iterator<ValueType> &);
+        friend bool operator<=(const ChunkList_const_iterator<ValueType> &left,
+                               const ChunkList_const_iterator<ValueType> &right) {
+            return left.iterator_position <= right.iterator_position;
+        }
 
-        friend bool operator>=(const ChunkList_const_iterator<ValueType> &,
-                               const ChunkList_const_iterator<ValueType> &);
-        // operator<=> will be handy
+        friend bool operator>(const ChunkList_const_iterator<ValueType> &left,
+                              const ChunkList_const_iterator<ValueType> &right) {
+            return left.iterator_position > right.iterator_position;
+        }
+
+        friend bool operator>=(const ChunkList_const_iterator<ValueType> &left,
+                               const ChunkList_const_iterator<ValueType> &right) {
+            return left.iterator_position >= right.iterator_position;
+        }
     };
 
     template<typename T, int N, typename Allocator = Allocator<T>>
