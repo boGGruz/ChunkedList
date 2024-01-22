@@ -531,7 +531,7 @@ namespace fefu_laboratory_two {
             }
         }
 
-        ChunkList(const ChunkList &other, const Allocator &alloc) {
+        ChunkList(const ChunkList &other, const Allocator &alloc) : chunks(new Chunk<value_type>(N,alloc)){
             Chunk<value_type> *our = chunks;
             Chunk<value_type> *not_our = other.chunks;
             chunk_list_size = other.chunk_list_size;
@@ -598,9 +598,11 @@ namespace fefu_laboratory_two {
         };
 
         void assign(size_type count, const T &value) {
-            clear();
-            for (size_type i = 0; i < count; i++) push_back(value);
-            chunk_list_size = count;
+            if (count > 0) {
+                clear();
+                for (size_type i = 0; i < count; i++) push_back(value);
+                chunk_list_size = count;
+            }
         };
 
         void assign(std::initializer_list<T> ilist) {
@@ -686,14 +688,17 @@ namespace fefu_laboratory_two {
             if (!chunk_list_size) {
                 return end();
             }
-            return ChunkList_iterator<value_type>(this, 0, &at(0));
+            ChunkList_const_iterator<value_type> iter1(this->chunks, 0, &at(0));
+            return iter1;
         }
 
         const_iterator begin() const noexcept {
             if (!chunk_list_size) {
                 return end();
             }
-            return ChunkList_const_iterator<value_type>(this, 0, &at(0));
+
+            ChunkList_const_iterator<value_type> iter1(this->chunks, 0, &at(0));
+            return iter1;
         }
 
         const_iterator cbegin() const noexcept {
@@ -740,8 +745,9 @@ namespace fefu_laboratory_two {
         void clear() noexcept {
             Chunk<value_type> *current_chunk = chunks;
             while (current_chunk != nullptr) {
+                Chunk<value_type>* temp_pointer = current_chunk;
                 current_chunk = current_chunk->next;
-                delete (current_chunk->prev);
+                delete temp_pointer;
             }
             chunk_list_size = 0;
             chunks = nullptr;

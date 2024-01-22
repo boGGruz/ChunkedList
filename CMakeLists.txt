@@ -3,4 +3,8 @@ project(ChunkList)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(ChunkList main.cpp ChunkList.hpp)
+include_directories(ChunkList)
+
+add_subdirectory(ChunkList)
+
+add_subdirectory(Google_tests)
