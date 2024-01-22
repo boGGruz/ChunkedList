@@ -810,80 +810,168 @@ namespace fefu_laboratory_two {
             return iter;
         }
 
-        /// @brief Inserts a new element into the container directly before pos.
-        /// @param pos iterator before which the new element will be constructed
-        /// @param ...args arguments to forward to the constructor of the element
-        /// @return terator pointing to the emplaced element.
         template<class... Args>
-        iterator emplace(const_iterator pos, Args &&... args);
+        iterator emplace(const_iterator pos, Args &&... args) {
+            auto data = { std::forward<Args>(args)... };
+            ChunkList_const_iterator<value_type> iter(this, pos.iterator_position, &at(pos.iterator_position));
 
-        /// @brief Removes the element at pos.
-        /// @param pos iterator to the element to remove
-        /// @return Iterator following the last removed element.
-        iterator erase(const_iterator pos);
+            for (auto i : data)
+                insert(pos, i);
 
-        /// @brief Removes the elements in the range [first, last).
-        /// @param first,last range of elements to remove
-        /// @return Iterator following the last removed element.
-        iterator erase(const_iterator first, const_iterator last);
+            return iter;
+        }
 
-        /// @brief Appends the given element value to the end of the container.
-        /// The new element is initialized as a copy of value.
-        /// @param value the value of the element to append
-        void push_back(const T &value);
+        iterator erase(const_iterator pos) {
+            ChunkList_const_iterator<value_type> iter(this, pos.iterator_position, &at(pos.iterator_position));
 
-        /// @brief Appends the given element value to the end of the container.
-        /// Value is moved into the new element.
-        /// @param value the value of the element to append
-        void push_back(T &&value);
+            while (true) {
+                *iter = *(iter +1);
+                iter++;
+                if (iter.iterator_position == chunk_list_size - 1) break;
+            }
 
-        /// @brief Appends a new element to the end of the container.
-        /// @param ...args arguments to forward to the constructor of the element
-        /// @return A reference to the inserted element.
+            chunk_list_size--;
+
+            ChunkList_const_iterator<value_type> iter1(this, pos.iterator_position, &at(pos.iterator_position));
+            return iter1;
+        }
+
+        iterator erase(const_iterator first, const_iterator last) {
+            auto t = last.iterator_position - first.iterator_position;
+
+            ChunkList_const_iterator<value_type> iter(this, first.iterator_position, &at(first.iterator_position));
+
+            for (int i = 0; i < t; i++)
+                erase(first+1);
+
+            return iter;
+        }
+
+        void push_back(const T &value) {
+            if (chunks == nullptr)
+                chunks = new Chunk<value_type>(N);
+
+            Chunk<value_type> * current_chunk = chunks;
+            while(current_chunk->next != nullptr){
+                current_chunk = current_chunk->next;
+            }
+
+            if (current_chunk->current_chunk_size == N){
+                current_chunk->next = new Chunk<value_type>(N);
+                auto temp = current_chunk;
+                current_chunk = current_chunk->next;
+                current_chunk->prev = temp;
+            }
+            current_chunk->chunk[current_chunk->current_chunk_size] = value;
+            current_chunk->current_chunk_size++;
+            chunk_list_size++;
+        }
+
+        void push_back(T &&value) {
+            if (chunks == nullptr)
+                chunks = new Chunk<value_type>(N);
+
+            Chunk<value_type> * current_chunk = chunks;
+            while(current_chunk->next != nullptr){
+                current_chunk = current_chunk->next;
+            }
+
+            if (current_chunk->current_chunk_size == N){
+                current_chunk->next = new Chunk<value_type>(N);
+                auto temp = current_chunk;
+                current_chunk = current_chunk->next;
+                current_chunk->prev = temp;
+            }
+            current_chunk->chunk[current_chunk->current_chunk_size] = std::move(value);
+            current_chunk->current_chunk_size++;
+            chunk_list_size++;
+        }
+
         template<class... Args>
-        reference emplace_back(Args &&... args);
+        reference emplace_back(Args &&... args){
+            auto data = { std::forward<Args>(args)... };
+            for (auto iter = data.begin(); iter != data.end(); iter++)
+                push_back(*iter);
+            return back();
+        }
 
-        /// @brief Removes the last element of the container.
-        void pop_back();
+        void pop_back() {
+            if(chunks == nullptr){
+                throw std::runtime_error("empty");
+                return;
+            }
+            chunk_list_size--;
+            Chunk<value_type> *current_chunk = chunks;
 
-        /// @brief Prepends the given element value to the beginning of the container.
-        /// @param value the value of the element to prepend
-        void push_front(const T &value);
+            while(current_chunk->next != nullptr) {
+                current_chunk = current_chunk->next;
+            }
 
-        /// @brief Prepends the given element value to the beginning of the container.
-        /// @param value moved value of the element to prepend
-        void push_front(T &&value);
+            current_chunk->current_chunk_size--;
+        }
 
-        /// @brief Inserts a new element to the beginning of the container.
-        /// @param ...args arguments to forward to the constructor of the element
-        /// @return A reference to the inserted element.
+        void push_front(const T &value) {
+            insert(cbegin(), value);
+        }
+
+        void push_front(T &&value) {
+            insert(cbegin(), std::move(value));
+        }
+
         template<class... Args>
-        reference emplace_front(Args &&... args);
+        reference emplace_front(Args &&... args) {
+            auto data = {std::forward<Args>(args)...};
+            auto current_element = data.end() - 1;
 
-        /// @brief Removes the first element of the container.
-        void pop_front();
+            while (true) {
+                insert(cbegin(), *current_element);
+                if (current_element == data.begin())
+                    break;
+                current_element--;
+            }
+            return back();
+        }
 
-        /// @brief Resizes the container to contain count elements.
-        /// If the current size is greater than count, the container is reduced to its
-        /// first count elements. If the current size is less than count, additional
-        /// default-inserted elements are appended
-        /// @param count new size of the container
-        void resize(size_type count);
+        void pop_front() {
+            erase(cbegin());
+        }
 
-        /// @brief Resizes the container to contain count elements.
-        /// If the current size is greater than count, the container is reduced to its
-        /// first count elements. If the current size is less than count, additional
-        /// copies of value are appended.
-        /// @param count new size of the container
-        /// @param value the value to initialize the new elements with
-        void resize(size_type count, const value_type &value);
+        void resize(size_type count) {
+            if (chunk_list_size == count)
+                return;
+            else if (chunk_list_size > count){
+                while(chunk_list_size != count)
+                    pop_back();
+            }
+            else {
+                while(chunk_list_size != count)
+                    push_back(value_type());
+            }
+        }
 
-        /// @brief Exchanges the contents of the container with those of other.
-        /// Does not invoke any move, copy, or swap operations on individual elements.
-        /// All iterators and references remain valid. The past-the-end iterator is
-        /// invalidated.
-        /// @param other container to exchange the contents with
-        void swap(ChunkList &other);
+        void resize(size_type count, const value_type &value){
+            if (chunk_list_size == count)
+                return;
+            else if (chunk_list_size > count){
+                while(chunk_list_size != count)
+                    pop_back();
+            }
+            else {
+                while(chunk_list_size != count)
+                    push_back(value);
+            }
+        }
+
+        void swap(ChunkList &other) {
+            Chunk<value_type>* temp;
+            int temp_size;
+            temp = other.chunks;
+            temp_size = other.chunk_list_size;
+            other.chunks = this->chunks;
+            other.chunk_list_size = this->chunk_list_size;
+            this->chunks = temp;
+            this->chunk_list_size=temp_size;
+        }
 
         template<class U, class Alloc>
         friend bool operator==(const ChunkList<U, N, Alloc> &lhs,
@@ -945,18 +1033,9 @@ namespace fefu_laboratory_two {
         std::swap(lhs, rhs);
     }
 
-/// @brief Erases all elements that compare equal to value from the container.
-/// @param c container from which to erase
-/// @param value value to be removed
-/// @return The number of erased elements.
     template<class T, int N, class Alloc, class U>
     typename ChunkList<T, N, Alloc>::size_type erase(ChunkList<T, N, Alloc> &c, const U &value);
 
-/// @brief Erases all elements that compare equal to value from the container.
-/// @param c container from which to erase
-/// @param pred unary predicate which returns ​true if the element should be
-/// erased.
-/// @return The number of erased elements.
     template<class T, int N, class Alloc, class Pred>
     typename ChunkList<T, N, Alloc>::size_type erase_if(ChunkList<T, N, Alloc> &c, Pred pred);
 }
