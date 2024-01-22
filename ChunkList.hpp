@@ -41,16 +41,25 @@ namespace fefu_laboratory_two {
         using pointer = ValueType *;
         using size_type = std::size_t;
         using value_type = ValueType;
+        using reference = ValueType &;
 
         int chunk_size = 0; //Number of elements in chunk
         int current_chunk_size = 0; //Number of already located in chunk
         pointer chunk = nullptr;
         Allocator<value_type> allocator;
-        Chunk *prev;
-        Chunk *next;
+        Chunk *prev = nullptr;
+        Chunk *next = nullptr;
+
+        Chunk() = default;
 
         explicit Chunk(int size) : chunk_size(size) {
             chunk = allocator.allocate(size);
+        }
+
+        Chunk(int size, Allocator<ValueType> allocator1) {
+            chunk_size = size;
+            chunk = allocator1.allocate(size);
+            allocator = allocator1;
         }
 
         size_type GetChunkSize() const {
@@ -61,8 +70,17 @@ namespace fefu_laboratory_two {
             return chunk[index];
         }
 
+        reference at(size_type position) {
+            if (position >= chunk_size || position < 0) {
+                throw std::out_of_range("Position is out of range!");
+            }
+            return chunk[position];
+        }
+
         Chunk(const Chunk<ValueType> &other) noexcept {
             chunk = allocator.allocate(other.chunk_size);
+            chunk_size = other.chunk_size;
+            current_chunk_size = other.current_chunk_size;
             for (size_type i = 0; i < other.chunk_size; i++) {
                 chunk[i] = other.chunk[i];
             }
@@ -74,6 +92,7 @@ namespace fefu_laboratory_two {
     protected:
         Chunk<ValueType> *chunk = nullptr; //Chunk, which is pointed by iterator
         int iterator_position = 0; // Iterator position in chunk
+        ValueType *current_value = nullptr;
 
     public:
         using iterator_category = std::random_access_iterator_tag;
@@ -90,29 +109,34 @@ namespace fefu_laboratory_two {
 
         ~ChunkList_iterator() = default;
 
-        ChunkList_iterator(Chunk<value_type> *current_chunk, std::size_t index) : chunk(current_chunk),
-                                                                                  iterator_position(index) {}
+        ChunkList_iterator(Chunk<value_type> *current_chunk, std::size_t index, value_type *value) : chunk(
+                current_chunk),
+                                                                                                     iterator_position(
+                                                                                                             index),
+                                                                                                     current_value(
+                                                                                                             value) {}
 
         friend void swap(ChunkList_iterator<ValueType> &left, ChunkList_iterator<ValueType> &right) {
             std::swap(left.chunk, right.chunk);
             std::swap(left.iterator_position, right.iterator_position);
+            std::swap(left.current_value, right.current_value);
         }
 
         friend bool operator==(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
-            return left.iterator_position == right.iterator_position;
+            return left.current_value == right.current_value;
         }
 
         friend bool operator!=(const ChunkList_iterator<ValueType> &left, const ChunkList_iterator<ValueType> &right) {
-            return left.iterator_position != right.iterator_position;
+            return left.current_value != right.current_value;
         }
 
-//        reference operator*() const {
-//            return static_cast<reference>(chunk[iterator_position]);
-//        }
-//
-//        pointer operator->() const {
-//            return this->chunk[this->iterator_position];
-//        }
+        reference operator*() const {
+            return *current_value;
+        }
+
+        pointer operator->() const {
+            return current_value;
+        }
 
         ChunkList_iterator &operator++() {
             if (chunk == nullptr)
@@ -121,9 +145,11 @@ namespace fefu_laboratory_two {
             if (this->iterator_position == chunk_size - 1) {
                 this->chunk = nullptr;
                 this->iterator_position = 0;
+                this->current_value = nullptr;
                 return *this;
             } else {
-                ++this->iterator_position;
+                ++iterator_position;
+                current_value = &chunk->at(iterator_position);
                 return *this;
             }
         }
@@ -134,9 +160,11 @@ namespace fefu_laboratory_two {
             ChunkList_iterator temp(*this);
             if (iterator_position == chunk->GetChunkSize() - 1) {
                 chunk = nullptr;
+                current_value = nullptr;
                 iterator_position = 0;
             } else {
                 ++this->iterator_position;
+                current_value = &chunk->at(iterator_position);
             }
             return temp;
         }
@@ -146,9 +174,11 @@ namespace fefu_laboratory_two {
                 throw std::exception();
             if (this->iterator_position == 0) {
                 this->chunk = nullptr;
+                current_value = nullptr;
                 return *this;
             } else {
                 --this->iterator_position;
+                current_value = &chunk->at(iterator_position);
                 return *this;
             }
         }
@@ -159,8 +189,10 @@ namespace fefu_laboratory_two {
             ChunkList_iterator temp(*this);
             if (iterator_position == 0) {
                 chunk = nullptr;
+                current_value = nullptr;
             } else {
                 --this->iterator_position;
+                current_value = &chunk->at(iterator_position);
             }
             return temp;
         }
@@ -171,8 +203,10 @@ namespace fefu_laboratory_two {
             if (iterator_position + index >= chunk->GetChunkSize()) {
                 temp.chunk = nullptr;
                 temp.iterator_position = 0;
+                temp.current_value = nullptr;
             } else {
                 temp.iterator_position = iterator_position + index;
+                temp.current_value = temp.chunk->at(iterator_position);
             }
 
             return temp;
@@ -182,8 +216,10 @@ namespace fefu_laboratory_two {
             if (iterator_position + index >= chunk->GetChunkSize()) {
                 chunk = nullptr;
                 iterator_position = 0;
+                current_value = nullptr;
             } else {
                 iterator_position = iterator_position + index;
+                current_value = &chunk->at(iterator_position);
             }
             return *this;
         }
@@ -194,8 +230,10 @@ namespace fefu_laboratory_two {
             if (iterator_position - index < 0) {
                 temp.chunk = nullptr;
                 temp.iterator_position = 0;
+                temp.current_value = nullptr;
             } else {
                 temp.iterator_position = iterator_position - index;
+                temp.current_value = temp.chunk->at(iterator_position);
             }
 
             return temp;
@@ -205,8 +243,10 @@ namespace fefu_laboratory_two {
             if (iterator_position - index < 0) {
                 chunk = nullptr;
                 iterator_position = 0;
+                current_value = nullptr;
             } else {
                 iterator_position = iterator_position - index;
+                current_value = &chunk->at(iterator_position);
             }
             return *this;
         }
@@ -235,7 +275,6 @@ namespace fefu_laboratory_two {
     template<typename ValueType>
     class ChunkList_const_iterator : public ChunkList_iterator<ValueType> {
     public:
-        using iterator_category = std::random_access_iterator_tag;
         using value_type = ValueType;
         using difference_type = std::ptrdiff_t;
         using pointer = const ValueType *;
@@ -245,8 +284,9 @@ namespace fefu_laboratory_two {
 
         ChunkList_const_iterator(const ChunkList_const_iterator &other) noexcept = default;
 
-        ChunkList_const_iterator(Chunk<value_type> *current_chunk, std::size_t index) :
-                ChunkList_iterator<value_type>(const_cast<Chunk<value_type> *>(current_chunk), index) {}
+        ChunkList_const_iterator(Chunk<value_type> *current_chunk, std::size_t index, value_type *value) :
+                ChunkList_iterator<value_type>(const_cast<Chunk<value_type> *>(current_chunk), index,
+                                               const_cast<value_type *>(value)) {}
 
         ChunkList_const_iterator &operator=(const ChunkList_const_iterator &) = default;
 
@@ -255,21 +295,26 @@ namespace fefu_laboratory_two {
         friend void swap(ChunkList_const_iterator<ValueType> &left, ChunkList_const_iterator<ValueType> &right) {
             std::swap(left.chunk, right.chunk);
             std::swap(left.iterator_position, right.iterator_position);
+            std::swap(left.current_value, right.current_value);
         }
 
         friend bool
         operator==(const ChunkList_const_iterator<ValueType> &left, const ChunkList_const_iterator<ValueType> &right) {
-            return left.iterator_position == right.iterator_position;
+            return left.current_value == right.current_value;
         }
 
         friend bool
         operator!=(const ChunkList_const_iterator<ValueType> &left, const ChunkList_const_iterator<ValueType> &right) {
-            return left.iterator_position != right.iterator_position;
+            return left.current_value != right.current_value;
         }
 
-//        reference operator*() const;
-//
-//        pointer operator->() const;
+        reference operator*() const {
+            return *this->current_value;
+        }
+
+        pointer operator->() const {
+            return this->current_value;
+        }
 
         ChunkList_const_iterator &operator++() {
             if (this->chunk == nullptr)
@@ -277,10 +322,12 @@ namespace fefu_laboratory_two {
             int chunk_size = this->chunk->GetChunkSize();
             if (this->iterator_position == chunk_size - 1) {
                 this->chunk = nullptr;
+                this->current_value = nullptr;
                 this->iterator_position = 0;
                 return *this;
             } else {
                 ++this->iterator_position;
+                this->current_value = &this->chunk->at(this->iterator_position);
                 return *this;
             }
         }
@@ -291,9 +338,11 @@ namespace fefu_laboratory_two {
             ChunkList_const_iterator temp(*this);
             if (this->iterator_position == this->chunk->GetChunkSize() - 1) {
                 this->chunk = nullptr;
+                this->current_value = nullptr;
                 this->iterator_position = 0;
             } else {
                 ++this->iterator_position;
+                this->current_value = &this->chunk->at(this->iterator_position);
             }
             return temp;
         }
@@ -302,10 +351,12 @@ namespace fefu_laboratory_two {
             if (this->chunk == nullptr)
                 throw std::exception();
             if (this->iterator_position == 0) {
+                this->current_value = nullptr;
                 this->chunk = nullptr;
                 return *this;
             } else {
                 --this->iterator_position;
+                this->current_value = &this->chunk->at(this->iterator_position);
                 return *this;
             }
         }
@@ -315,9 +366,11 @@ namespace fefu_laboratory_two {
                 throw std::exception();
             ChunkList_const_iterator temp(*this);
             if (this->iterator_position == 0) {
+                this->current_value = nullptr;
                 this->chunk = nullptr;
             } else {
                 --this->iterator_position;
+                this->current_value = &this->chunk->at(this->iterator_position);
             }
             return temp;
         }
@@ -328,8 +381,10 @@ namespace fefu_laboratory_two {
             if (this->iterator_position + index >= this->chunk->GetChunkSize()) {
                 temp.chunk = nullptr;
                 temp.iterator_position = 0;
+                temp.current_value = nullptr;
             } else {
                 temp.iterator_position = this->iterator_position + index;
+                temp.current_value = temp.chunk->at(this->iterator_position);
             }
 
             return temp;
@@ -339,8 +394,10 @@ namespace fefu_laboratory_two {
             if (this->iterator_position + index >= this->chunk->GetChunkSize()) {
                 this->chunk = nullptr;
                 this->iterator_position = 0;
+                this->current_value = nullptr;
             } else {
                 this->iterator_position = this->iterator_position + index;
+                this->current_value = &this->chunk->at(this->iterator_position);
             }
             return *this;
         }
@@ -351,8 +408,10 @@ namespace fefu_laboratory_two {
             if (this->iterator_position - this->index < 0) {
                 temp.chunk = nullptr;
                 temp.iterator_position = 0;
+                temp.current_value = nullptr;
             } else {
                 temp.iterator_position = this->iterator_position - this->index;
+                temp.current_value = temp.chunk->at(this->iterator_position);
             }
 
             return temp;
@@ -362,8 +421,10 @@ namespace fefu_laboratory_two {
             if (this->iterator_position - this->index < 0) {
                 this->chunk = nullptr;
                 this->iterator_position = 0;
+                this->current_value = nullptr;
             } else {
                 this->iterator_position = this->iterator_position - this->index;
+                this->current_value = &this->chunk->at(this->iterator_position);
             }
             return *this;
         }
@@ -394,7 +455,10 @@ namespace fefu_laboratory_two {
     };
 
     template<typename T, int N, typename Allocator = Allocator<T>>
-    class ChunkList {
+    class ChunkList : Chunk<T> {
+    protected:
+        int chunk_list_size = 0;
+        Chunk<T> *chunks = nullptr;
     public:
         using value_type = T;
         using allocator_type = Allocator;
@@ -407,272 +471,344 @@ namespace fefu_laboratory_two {
         using iterator = ChunkList_iterator<value_type>;
         using const_iterator = ChunkList_const_iterator<value_type>;
 
-        /// @brief Default constructor. Constructs an empty container with a
-        /// default-constructed allocator.
-        ChunkList();
+        ChunkList() : chunks(new Chunk<T>(N)) {}
 
-        /// @brief Constructs an empty container with the given allocator
-        /// @param alloc allocator to use for all memory allocations of this container
-        explicit ChunkList(const Allocator &alloc);
+        explicit ChunkList(const Allocator &alloc) : chunks(new Chunk<T>(N, alloc)) {}
 
-        /// @brief Constructs the container with count copies of elements with value
-        /// and with the given allocator
-        /// @param count the size of the container
-        /// @param value the value to initialize elements of the container with
-        /// @param alloc allocator to use for all memory allocations of this container
-        ChunkList(size_type count, const T &value, const Allocator &alloc = Allocator());
+        ChunkList(size_type count, const T &value, const Allocator &alloc = Allocator()) : chunks(new Chunk<T>(N)) {
+            Chunk<value_type> *current_chunk = chunks;
+            for (chunk_list_size; chunk_list_size < count;) {
+                current_chunk->allocator = alloc;
+                for (int i = 0; i < N; i++) {
+                    if (chunk_list_size < count) {
+                        current_chunk->chunk[i] = value;
+                        current_chunk->current_chunk_size++;
+                        chunk_list_size++;
+                    } else {
+                        return;
+                    }
+                }
+                Chunk<value_type> *previous_chunk = current_chunk;
+                previous_chunk->next = new Chunk<value_type>(N, alloc);
+                current_chunk = previous_chunk->next;
+                current_chunk->prev = previous_chunk;
+            }
+        }
 
-        /// @brief Constructs the container with count default-inserted instances of
-        /// T. No copies are made.
-        /// @param count the size of the container
-        /// @param alloc allocator to use for all memory allocations of this container
-        explicit ChunkList(size_type count, const Allocator &alloc = Allocator());
+        explicit ChunkList(size_type count, const Allocator &alloc = Allocator()) : chunks(new Chunk<T>(N)) {
+            Chunk<value_type> *current_chunk = chunks;
+            for (chunk_list_size; chunk_list_size < count;) {
+                current_chunk->allocator = alloc;
+                for (int i = 0; i < N; i++) {
+                    if (chunk_list_size < count) {
+                        current_chunk->current_chunk_size++;
+                        chunk_list_size++;
+                    } else {
+                        return;
+                    }
+                }
+                Chunk<value_type> *previous_chunk = current_chunk;
+                previous_chunk->next = new Chunk<value_type>(N, alloc);
+                current_chunk = previous_chunk->next;
+                current_chunk->prev = previous_chunk;
+            }
+        }
 
-        /// @brief Constructs the container with the contents of the range [first,
-        /// last).
-        /// @tparam InputIt Input Iterator
-        /// @param first, last 	the range to copy the elements from
-        /// @param alloc allocator to use for all memory allocations of this container
-        template<class InputIt>
-        ChunkList(InputIt first, InputIt last, const Allocator &alloc = Allocator());
+        ChunkList(const ChunkList &other) : chunks(new Chunk<T>(N)) {
+            Chunk<value_type> *our = chunks;
+            Chunk<value_type> *not_our = other.chunks;
+            chunk_list_size = other.chunk_list_size;
+            while (not_our != nullptr) {
+                for (int i = 0; i < not_our->current_chunk_size; i++) {
+                    our->chunk[i] = not_our->chunk[i];
+                    our->current_chunk_size++;
+                }
+                Chunk<value_type> *next_chunk = new Chunk<T>(N);
+                next_chunk->prev = our;
+                our->next = next_chunk;
+                our = next_chunk;
+                not_our = not_our->next;
+            }
+        }
 
-        /// @brief Copy constructor. Constructs the container with the copy of the
-        /// contents of other.
-        /// @param other another container to be used as source to initialize the
-        /// elements of the container with
-        ChunkList(const ChunkList &other);
+        ChunkList(const ChunkList &other, const Allocator &alloc) {
+            Chunk<value_type> *our = chunks;
+            Chunk<value_type> *not_our = other.chunks;
+            chunk_list_size = other.chunk_list_size;
+            while (not_our != nullptr) {
+                for (int i = 0; i < not_our->current_chunk_size; i++) {
+                    our->chunk[i] = not_our->chunk[i];
+                    our->current_chunk_size++;
+                }
+                Chunk<value_type> *next_chunk = new Chunk<T>(N, alloc);
+                next_chunk->prev = our;
+                our->next = next_chunk;
+                our = next_chunk;
+                not_our = not_our->next;
+            }
+        }
 
-        /// @brief Constructs the container with the copy of the contents of other,
-        /// using alloc as the allocator.
-        /// @param other another container to be used as source to initialize the
-        /// elements of the container with
-        /// @param alloc allocator to use for all memory allocations of this container
-        ChunkList(const ChunkList &other, const Allocator &alloc);
+        ChunkList(ChunkList &&other) {
+            chunks = std::move(other.chunks);
+            chunk_list_size = std::move(other.chunk_list_size);
+            other.chunks = nullptr;
+            other.chunk_list_size = 0;
+        }
 
-        /**
-         * @brief Move constructor.
-         *
-         * Constructs the container with the contents of other using move semantics.
-         * Allocator is obtained by move-construction from the allocator belonging to
-         * other.
-         *
-         * @param other another container to be used as source to initialize the
-         * elements of the container with
-         */
-        ChunkList(ChunkList &&other);
+        ChunkList(ChunkList &&other, const Allocator &alloc) : chunks(other.chunks),
+                                                               chunk_list_size(other.chunk_list_size) {
+            Chunk<value_type> *current_chunk = this->chunks;
+            while (current_chunk != nullptr) {
+                current_chunk->allocator = alloc;
+                current_chunk = current_chunk->next;
+            }
+            other.chunk_list_size = 0;
+            other.chunks = nullptr;
+        }
 
-        /**
-         * @brief Allocator-extended move constructor.
-         * Using alloc as the allocator for the new container, moving the contents
-         * from other; if alloc != other.get_allocator(), this results in an
-         * element-wise move.
-         *
-         * @param other another container to be used as source to initialize the
-         * elements of the container with
-         * @param alloc allocator to use for all memory allocations of this container
-         */
-        ChunkList(ChunkList &&other, const Allocator &alloc);
+        ChunkList(std::initializer_list<T> init, const Allocator &alloc = Allocator()) {
+            if (init.size() == 0) return;
+            chunks = new Chunk(alloc);
 
-        /// @brief Constructs the container with the contents of the initializer list
-        /// init.
-        /// @param init initializer list to initialize the elements of the container
-        /// with
-        /// @param alloc allocator to use for all memory allocations of this container
-        ChunkList(std::initializer_list<T> init, const Allocator &alloc = Allocator());
+            auto it = init.begin();
 
-        /// @brief Destructs the ChunkList.
-        ~ChunkList();
+            for (; it != init.end(); ++it)
+                push_back(*it);
+        }
 
-        /// @brief Copy assignment operator. Replaces the contents with a copy of the
-        /// contents of other.
-        /// @param other another container to use as data source
-        /// @return *this
-        ChunkList &operator=(const ChunkList &other);
+        ~ChunkList() = default;
 
-        /**
-         * Move assignment operator.
-         *
-         * Replaces the contents with those of other using move semantics
-         * (i.e. the data in other is moved from other into this container).
-         * other is in a valid but unspecified state afterwards.
-         *
-         * @param other another container to use as data source
-         * @return *this
-         */
-        ChunkList &operator=(ChunkList &&other);
+        ChunkList &operator=(const ChunkList &other) {
+            this = new ChunkList(other);
+            return *this;
+        }
 
-        /// @brief Replaces the contents with those identified by initializer list
-        /// ilist.
-        /// @param ilist
-        /// @return this
-        ChunkList &operator=(std::initializer_list<T> ilist);
+        ChunkList &operator=(ChunkList &&other) {
+            chunks = std::move(other.chunks);
+            chunk_list_size = std::move(other.chunk_list_size);
+            other.clear();
+            return *this;
+        }
 
-        /// @brief Replaces the contents with count copies of value
-        /// @param count
-        /// @param value
-        void assign(size_type count, const T &value);
+        ChunkList &operator=(std::initializer_list<T> ilist) {
+            auto it = ilist.begin();
 
-        /// @brief Replaces the contents with copies of those in the range [first,
-        /// last).
-        /// @tparam InputIt
-        /// @param first
-        /// @param last
-        template<class InputIt>
-        void assign(InputIt first, InputIt last);
+            for (; it != ilist.end(); ++it) push_back(*it);
+            return *this;
+        };
 
-        /// @brief Replaces the contents with the elements from the initializer list
-        /// ilis
-        /// @param ilist
-        void assign(std::initializer_list<T> ilist);
+        void assign(size_type count, const T &value) {
+            clear();
+            for (size_type i = 0; i < count; i++) push_back(value);
+            chunk_list_size = count;
+        };
 
-        /// @brief Returns the allocator associated with the container.
-        /// @return The associated allocator.
-        allocator_type get_allocator() const noexcept;
+        void assign(std::initializer_list<T> ilist) {
+            if (ilist.size() == 0) return;
+            clear();
 
-        /// ELEMENT ACCESS
+            auto it = ilist.begin();
 
-        /// @brief Returns a reference to the element at specified location pos, with
-        /// bounds checking. If pos is not within the range of the container, an
-        /// exception of type std::out_of_range is thrown.
-        /// @param pos position of the element to return
-        /// @return Reference to the requested element.
-        /// @throw std::out_of_range
-        reference at(size_type pos);
+            for (; it != ilist.end(); ++it) push_back(*it);
+        };
 
-        /// @brief Returns a const reference to the element at specified location pos,
-        /// with bounds checking. If pos is not within the range of the container, an
-        /// exception of type std::out_of_range is thrown.
-        /// @param pos position of the element to return
-        /// @return Const Reference to the requested element.
-        /// @throw std::out_of_range
-        const_reference at(size_type pos) const;
+        allocator_type get_allocator() const noexcept {
+            return chunks->allocator;
+        }
 
-        /// @brief Returns a reference to the element at specified location pos. No
-        /// bounds checking is performed.
-        /// @param pos position of the element to return
-        /// @return Reference to the requested element.
-        reference operator[](size_type pos);
+        reference at(size_type pos) {
+            Chunk<value_type> *current_chunk = chunks;
+            int count = 0;
+            while (current_chunk != nullptr) {
+                count++;
+                current_chunk = current_chunk->next;
+            }
+            int chunk_pos = pos / N;
+            int elem_pos = pos % N;
+            if (pos >= N * count || pos < 0) throw std::out_of_range("Out of bounds");
 
-        /// @brief Returns a const reference to the element at specified location pos.
-        /// No bounds checking is performed.
-        /// @param pos position of the element to return
-        /// @return Const Reference to the requested element.
-        const_reference operator[](size_type pos) const;
+            Chunk<value_type> *temp = chunks;
+            for (int i = 0; i < chunk_pos; i++) {
+                temp = temp->next;
+            }
+            return temp->chunk[elem_pos];
+        }
 
-        /// @brief Returns a reference to the first element in the container.
-        /// Calling front on an empty container is undefined.
-        /// @return Reference to the first element
-        reference front();
+        const_reference at(size_type pos) const {
+            Chunk<value_type> *current_chunk = chunks;
+            int count = 0;
+            while (current_chunk != nullptr) {
+                count++;
+                current_chunk = current_chunk->next;
+            }
+            int chunk_pos = pos / N;
+            int elem_pos = pos % N;
+            if (pos >= N * count || pos < 0) throw std::out_of_range("Out of bounds");
 
-        /// @brief Returns a const reference to the first element in the container.
-        /// Calling front on an empty container is undefined.
-        /// @return Const reference to the first element
-        const_reference front() const;
+            Chunk<value_type> *temp = chunks;
+            for (int i = 0; i < chunk_pos; i++) {
+                temp = temp->next;
+            }
+            return temp->chunk[elem_pos];
+        }
 
-        /// @brief Returns a reference to the last element in the container.
-        /// Calling back on an empty container causes undefined behavior.
-        /// @return Reference to the last element.
-        reference back();
+        reference operator[](size_type pos) {
+            return at(pos);
+        }
 
-        /// @brief Returns a const reference to the last element in the container.
-        /// Calling back on an empty container causes undefined behavior.
-        /// @return Const Reference to the last element.
-        const_reference back() const;
+        const_reference operator[](size_type pos) const {
+            return at(pos);
+        }
 
-        /// ITERATORS
+        reference front() {
+            return chunk_list_size ? chunks->chunk[0] : throw std::runtime_error("Empty");
+        }
 
-        /// @brief Returns an iterator to the first element of the ChunkList.
-        /// If the ChunkList is empty, the returned iterator will be equal to end().
-        /// @return Iterator to the first element.
-        iterator begin() noexcept;
+        const_reference front() const {
+            return chunk_list_size ? static_cast<reference>(chunks->chunk[0]) : throw std::runtime_error("Empty");
+        }
 
-        /// @brief Returns an iterator to the first element of the ChunkList.
-        /// If the ChunkList is empty, the returned iterator will be equal to end().
-        /// @return Iterator to the first element.
-        const_iterator begin() const noexcept;
+        reference back() {
+            if (chunk_list_size == 0) throw std::runtime_error("Empty");
+            Chunk<value_type> *current_chunk = chunks;
+            while (current_chunk->next != nullptr) current_chunk = current_chunk->next;
+            return current_chunk->chunk[current_chunk->current_chunk_size - 1];
+        }
 
-        /// @brief Same to begin()
-        const_iterator cbegin() const noexcept;
+        const_reference back() const {
+            if (chunk_list_size == 0) throw std::runtime_error("Empty");
+            Chunk<value_type> *current_chunk = chunks;
+            while (current_chunk->next != nullptr) current_chunk = current_chunk->next;
+            return const_cast<reference>(current_chunk->chunk[current_chunk->current_chunk_size - 1]);
+        }
 
-        /// @brief Returns an iterator to the element following the last element of
-        /// the ChunkList. This element acts as a placeholder; attempting to access it
-        /// results in undefined behavior.
-        /// @return Iterator to the element following the last element.
-        iterator end() noexcept;
+        iterator begin() noexcept {
+            if (!chunk_list_size) {
+                return end();
+            }
+            return ChunkList_iterator<value_type>(this, 0, &at(0));
+        }
 
-        /// @brief Returns an constant iterator to the element following the last
-        /// element of the ChunkList. This element acts as a placeholder; attempting to
-        /// access it results in undefined behavior.
-        /// @return Constant Iterator to the element following the last element.
-        const_iterator end() const noexcept;
+        const_iterator begin() const noexcept {
+            if (!chunk_list_size) {
+                return end();
+            }
+            return ChunkList_const_iterator<value_type>(this, 0, &at(0));
+        }
 
-        /// @brief Same to end()
-        const_iterator cend() const noexcept;
+        const_iterator cbegin() const noexcept {
+            return begin();
+        }
 
-        /// CAPACITY
+        iterator end() noexcept {
+            return ChunkList_iterator<value_type>();
+        }
 
-        /// @brief Checks if the container has no elements
-        /// @return true if the container is empty, false otherwise
-        bool empty() const noexcept;
+        const_iterator end() const noexcept {
+            return ChunkList_const_iterator<value_type>();
+        }
 
-        /// @brief Returns the number of elements in the container
-        /// @return The number of elements in the container.
-        size_type size() const noexcept;
+        const_iterator cend() const noexcept {
+            return end();
+        }
 
-        /// @brief Returns the maximum number of elements the container is able to
-        /// hold due to system or library implementation limitations
-        /// @return Maximum number of elements.
-        size_type max_size() const noexcept;
+        bool empty() const noexcept {
+            return !chunk_list_size;
+        }
 
-        /// @brief Requests the removal of unused capacity.
-        /// It is a non-binding request to reduce the memory usage without changing
-        /// the size of the sequence. All iterators and references are invalidated.
-        /// Past-the-end iterator is also invalidated.
-        void shrink_to_fit();
+        size_type size() const noexcept {
+            return chunk_list_size;
+        }
 
-        /// MODIFIERS
+        size_type max_size() const noexcept {
+            return (chunk_list_size % N) == 0 ? chunk_list_size : (chunk_list_size + N - chunk_list_size % N);
+        }
 
-        /// @brief Erases all elements from the container.
-        /// nvalidates any references, pointers, or iterators referring to contained
-        /// elements. Any past-the-end iterators are also invalidated.
-        void clear() noexcept;
+        void shrink_to_fit() {
+            Chunk<value_type> *current_chunk = chunks;
 
-        /// @brief Inserts value before pos.
-        /// @param pos iterator before which the content will be inserted.
-        /// @param value element value to insert
-        /// @return Iterator pointing to the inserted value.
-        iterator insert(const_iterator pos, const T &value);
+            while (current_chunk->next != nullptr) {
+                current_chunk = current_chunk->next;
+            }
 
-        /// @brief Inserts value before pos.
-        /// @param pos iterator before which the content will be inserted.
-        /// @param value element value to insert
-        /// @return Iterator pointing to the inserted value.
-        iterator insert(const_iterator pos, T &&value);
+            while (current_chunk->current_chunk_size == 0) {
+                current_chunk = current_chunk->prev;
+                current_chunk->next = nullptr;
+            }
+        }
 
-        /// @brief Inserts count copies of the value before pos.
-        /// @param pos iterator before which the content will be inserted.
-        /// @param count number of elements to insert
-        /// @param value element value to insert
-        /// @return Iterator pointing to the first element inserted, or pos if count
-        /// == 0.
-        iterator insert(const_iterator pos, size_type count, const T &value);
+        void clear() noexcept {
+            Chunk<value_type> *current_chunk = chunks;
+            while (current_chunk != nullptr) {
+                current_chunk = current_chunk->next;
+                delete (current_chunk->prev);
+            }
+            chunk_list_size = 0;
+            chunks = nullptr;
+        }
 
-        /// @brief Inserts elements from range [first, last) before pos.
-        /// @tparam InputIt Input Iterator
-        /// @param pos iterator before which the content will be inserted.
-        /// @param first,last the range of elements to insert, can't be iterators into
-        /// container for which insert is called
-        /// @return Iterator pointing to the first element inserted, or pos if first
-        /// == last.
-        template<class InputIt>
-        iterator insert(const_iterator pos, InputIt first, InputIt last);
+        iterator insert(const_iterator pos, const T &value) {
+            push_back(value_type());
+            ChunkList_const_iterator<value_type> iter(this, chunk_list_size - 1, &at(chunk_list_size - 1));
 
-        /// @brief Inserts elements from initializer list before pos.
-        /// @param pos iterator before which the content will be inserted.
-        /// @param ilist initializer list to insert the values from
-        /// @return Iterator pointing to the first element inserted, or pos if ilist
-        /// is empty.
-        iterator insert(const_iterator pos, std::initializer_list<T> ilist);
+            bool flag = true; // Dislocated by 1 to right
+            while (flag) {
+                *iter = *(iter - 1);
+                iter--;
+                if (iter == pos)
+                    flag = false;
+            }
+
+            *iter = value;
+            return iter;
+        }
+
+        iterator insert(const_iterator pos, T &&value) {
+            push_back(value_type());
+            ChunkList_const_iterator<value_type> iter(this, chunk_list_size - 1, &at(chunk_list_size - 1));
+
+            bool flag = true; // Dislocated by 1 to right
+            while (flag) {
+                *iter = *(iter - 1);
+                iter--;
+                if (iter == pos)
+                    flag = false;
+            }
+
+            *iter = std::move(value);
+            return iter;
+        }
+
+        iterator insert(const_iterator pos, size_type count, const T &value) {
+            if (count == 0) return pos;
+
+            ChunkList_const_iterator<value_type> iter(this, pos.iterator_position, at(pos.iterator_position));
+
+            for (int i = 0; i < count; i++)
+                insert(pos, value);
+
+            return iter;
+        }
+
+        iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
+            if (empty(ilist))
+                return pos;
+
+            ChunkList_const_iterator<value_type> iter(this, pos.iterator_position, at(pos.iterator_position));
+
+            T current_element = ilist.end() - 1;
+
+            bool flag = true;
+            while (flag) {
+                insert(pos, *current_element);
+                if (current_element == ilist.begin()) {
+                    flag = false;
+                    break;
+                }
+                current_element--;
+            }
+            return iter;
+        }
 
         /// @brief Inserts a new element into the container directly before pos.
         /// @param pos iterator before which the new element will be constructed
@@ -749,51 +885,65 @@ namespace fefu_laboratory_two {
         /// @param other container to exchange the contents with
         void swap(ChunkList &other);
 
-        /// COMPARISIONS
+        template<class U, class Alloc>
+        friend bool operator==(const ChunkList<U, N, Alloc> &lhs,
+                               const ChunkList<U, N, Alloc> &rhs) {
+            bool flag = true;
+            if (lhs.chunk_list_size == rhs.chunk_list_size) {
+                for (int i = 0; i < lhs.chunk_list_size; i++) {
+                    if (lhs.at(i) == rhs.at(i)) {
+                        flag = true;
+                    } else {
+                        flag = false;
+                        break;
+                    }
+                }
+            }
+            return flag;
+        }
 
-        /// @brief Checks if the contents of lhs and rhs are equal
-        /// @param lhs,rhs ChunkLists whose contents to compare
-//        template<class U, class Alloc>
-//        friend bool operator==(const ChunkList<U, Alloc> &lhs,
-//                               const ChunkList<U, Alloc> &rhs);
-//
-//        /// @brief Checks if the contents of lhs and rhs are not equal
-//        /// @param lhs,rhs ChunkLists whose contents to compare
-//        template<class U, class Alloc>
-//        friend bool operator!=(const ChunkList<U, Alloc> &lhs,
-//                               const ChunkList<U, Alloc> &rhs);
-//
-//        /// @brief Compares the contents of lhs and rhs lexicographically.
-//        /// @param lhs,rhs ChunkLists whose contents to compare
-//        template<class U, class Alloc>
-//        friend bool operator>(const ChunkList<U, Alloc> &lhs, const ChunkList<U, Alloc> &rhs);
-//
-//        /// @brief Compares the contents of lhs and rhs lexicographically.
-//        /// @param lhs,rhs ChunkLists whose contents to compare
-//        template<class U, class Alloc>
-//        friend bool operator<(const ChunkList<U, Alloc> &lhs, const ChunkList<U, Alloc> &rhs);
-//
-//        /// @brief Compares the contents of lhs and rhs lexicographically.
-//        /// @param lhs,rhs ChunkLists whose contents to compare
-//        template<class U, class Alloc>
-//        friend bool operator>=(const ChunkList<U, Alloc> &lhs,
-//                               const ChunkList<U, Alloc> &rhs);
-//
-//        /// @brief Compares the contents of lhs and rhs lexicographically.
-//        /// @param lhs,rhs ChunkLists whose contents to compare
-//        template<class U, class Alloc>
-//        friend bool operator<=(const ChunkList<U, Alloc> &lhs,
-//                               const ChunkList<U, Alloc> &rhs);
+        template<class U, class Alloc>
+        friend bool operator!=(const ChunkList<U, N, Alloc> &lhs,
+                               const ChunkList<U, N, Alloc> &rhs) {
+            return !operator==(lhs, rhs);
+        }
 
-        // operator <=> will be handy
+        template<class U, class Alloc>
+        friend bool operator>(const ChunkList<U, N, Alloc> &lhs, const ChunkList<U, N, Alloc> &rhs) {
+            if (lhs.chunk_list_size <= rhs.chunk_list_size)
+                return false;
+            if (lhs.chunk_list_size > rhs.chunk_list_size)
+                return true;
+            for (int i = 0; i < lhs.chunk_list_size; i++) {
+                if (rhs.at(i) >= rhs.at(i))
+                    return false;
+            }
+            return true;
+        }
+
+        template<class U, class Alloc>
+        friend bool operator<(const ChunkList<U, N, Alloc> &lhs, const ChunkList<U, N, Alloc> &rhs) {
+            return !(operator==(lhs, rhs) || operator>(lhs, rhs));
+        }
+
+        template<class U, class Alloc>
+        friend bool operator>=(const ChunkList<U, N, Alloc> &lhs,
+                               const ChunkList<U, N, Alloc> &rhs) {
+            return !(operator<(lhs, rhs));
+        }
+
+        template<class U, class Alloc>
+        friend bool operator<=(const ChunkList<U, N, Alloc> &lhs,
+                               const ChunkList<U, N, Alloc> &rhs) {
+            return !(operator>(lhs, rhs));
+        }
+
     };
 
-/// NON-MEMBER FUNCTIONS
-
-/// @brief  Swaps the contents of lhs and rhs.
-/// @param lhs,rhs containers whose contents to swap
     template<class T, int N, class Alloc>
-    void swap(ChunkList<T, N, Alloc> &lhs, ChunkList<T, N, Alloc> &rhs);
+    void swap(ChunkList<T, N, Alloc> &lhs, ChunkList<T, N, Alloc> &rhs) {
+        std::swap(lhs, rhs);
+    }
 
 /// @brief Erases all elements that compare equal to value from the container.
 /// @param c container from which to erase

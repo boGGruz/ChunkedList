@@ -2,36 +2,33 @@
 #include <cassert>
 #include "ChunkList.hpp"
 
+using namespace fefu_laboratory_two;
+
 int main() {
-    fefu_laboratory_two::Chunk<int> chunk1(5);
-    fefu_laboratory_two::Chunk<int> chunk2(3);
+    Chunk<int> chunk1(5, Allocator<int>());
+    for (int i = 0; i < 5; i++)
+        chunk1[i] = i * 10;
 
-    chunk2[0] = 1;
-    chunk2[1] = 2;
-    chunk2[2] = 3;
+    Chunk<int> chunk2(5, Allocator<int>());
+    for (int i = 0; i < 5; i++)
+        chunk2[i] = i * 20;
 
-    fefu_laboratory_two::ChunkList_iterator<int> iter1(&chunk1, 2);
-    fefu_laboratory_two::ChunkList_iterator<int> iter2(&chunk2, 1);
-    fefu_laboratory_two::ChunkList_iterator<int> iter3(&chunk1, 4);
+    ChunkList_iterator<int> iter1(&chunk1, 0, 0);
 
-    ++iter1;
-    --iter2;
-    iter1++;
+    ChunkList_iterator<int> iter2(&chunk2, 0, 0);
+
+    assert(iter1==iter2);
+//    assert(iter1!=iter2);
+    std::cout << iter1.operator->();
+
     iter2++;
+    ++iter2;
 
-    fefu_laboratory_two::ChunkList_iterator<int> iter_sum = iter1 + 2;
+    assert(iter1 > iter2);
 
-//    assert(iter1 != iter2);
-//    assert(iter1 < iter3);
-//    assert(iter3 > iter2);
-//    assert(iter3 >= iter2);
-//    assert(iter2 <= iter3);
-//    assert(iter1[2] == iter2[1]);
+    iter2+=12;
 
-    fefu_laboratory_two:: ChunkList_iterator<int> iter_copy = iter1;
-
-    iter1 += 2;
-    iter_sum -= 2;
-
+    Chunk<int> *chunk = &chunk2;
+    std::cout << &chunk[1];
     return 0;
 }
